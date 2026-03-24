@@ -3,52 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CS 2D Ultimate - Fog & Mobile</title>
+    <title>CS 2D Ultra - Neon Edition</title>
     <style>
-        body { margin: 0; padding: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', sans-serif; user-select: none; touch-action: none; }
+        :root { --neon-green: #2ecc71; --neon-red: #ff4757; --neon-orange: #ffa502; }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #0a0a0c; font-family: 'Cairo', sans-serif; user-select: none; touch-action: none; }
         canvas { display: block; }
         
-        #ui { position: absolute; top: 15px; left: 15px; color: #fff; pointer-events: none; z-index: 10; text-shadow: 2px 2px 4px #000; }
-        .stats-box { background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #444; }
-        .bar-bg { width: 150px; height: 12px; background: #300; border: 1px solid #ff4d4d; border-radius: 6px; overflow: hidden; margin: 5px 0; }
-        #hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4d4d, #ff0000); transition: width 0.3s; }
+        #ui { position: absolute; top: 15px; left: 15px; color: #fff; pointer-events: none; z-index: 10; }
+        .stats-box { background: rgba(15, 15, 20, 0.85); padding: 15px; border-radius: 15px; border: 2px solid #333; backdrop-filter: blur(5px); min-width: 180px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .bar-bg { width: 100%; height: 12px; background: #222; border-radius: 6px; overflow: hidden; margin: 8px 0; border: 1px solid #444; }
+        #hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, var(--neon-red), #ff6b81); transition: width 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .stat-item { font-size: 14px; display: flex; justify-content: space-between; font-weight: bold; }
 
-        /* الأزرار والشاشات */
-        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
-        button { padding: 15px 50px; font-size: 22px; cursor: pointer; background: #2ecc71; color: white; border: none; border-radius: 50px; font-weight: bold; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4); transition: 0.2s; }
-        button:active { transform: scale(0.95); background: #27ae60; }
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, #1a1a2e 0%, #0a0a0c 100%); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; text-align: center; }
+        
+        .menu-content { background: rgba(255,255,255,0.05); padding: 30px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.1); }
+        h1 { font-size: 45px; margin-bottom: 10px; background: linear-gradient(to bottom, #fff, var(--neon-green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 10px var(--neon-green)); }
+        
+        .diff-container { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-diff { padding: 12px 25px; border-radius: 10px; border: none; cursor: pointer; color: white; font-weight: bold; font-size: 16px; transition: 0.3s; pointer-events: auto; }
+        .easy { background: #27ae60; } .med { background: #f39c12; } .hard { background: #c0392b; }
+        .btn-diff:hover { transform: translateY(-5px); filter: brightness(1.2); }
         .hidden { display: none !important; }
 
-        /* تحكم الهاتف */
-        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 130px; height: 130px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 20; }
-        #joystick-stick { position: absolute; top: 40px; left: 40px; width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; }
-        #fire-btn { position: absolute; bottom: 50px; right: 50px; width: 100px; height: 100px; background: rgba(255,0,0,0.3); border: 4px solid #fff; border-radius: 50%; display: none; z-index: 20; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; }
+        /* التحكم - Joystick */
+        #joy-bound { position: absolute; width: 120px; height: 120px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; touch-action: none; pointer-events: none; z-index: 5; }
+        #joy-stick { position: absolute; top: 35px; left: 35px; width: 50px; height: 50px; background: var(--neon-green); border-radius: 50%; box-shadow: 0 0 15px var(--neon-green); pointer-events: none; }
+        
+        .mobile-btn { position: absolute; border-radius: 50%; display: none; z-index: 20; color: #fff; font-weight: bold; align-items: center; justify-content: center; border: 2px solid rgba(255,255,255,0.3); touch-action: none; }
+        #fire-btn { bottom: 60px; right: 50px; width: 100px; height: 100px; background: rgba(255,71,87,0.4); box-shadow: 0 0 20px rgba(255,71,87,0.2); font-size: 18px; }
+        #grenade-btn { bottom: 180px; right: 60px; width: 65px; height: 65px; background: rgba(255,165,2,0.4); font-size: 12px; }
     </style>
 </head>
 <body>
 
 <div id="ui">
     <div class="stats-box">
-        <div>الصحة</div>
+        <div class="stat-item"><span>صحة المحارب</span> <span id="hp-val">100</span></div>
         <div class="bar-bg"><div id="hp-fill"></div></div>
-        <div>الذخيرة: <span id="ammo-text">30</span> | النقاط: <span id="score-text">0</span></div>
+        <div class="stat-item"><span>الرصاص</span> <b id="ammo-text">40</b></div>
+        <div class="stat-item"><span>قنابل</span> <b id="grenade-text">3</b></div>
+        <div class="stat-item" style="color: var(--neon-green);"><span>النقاط</span> <b id="score-text">0</b></div>
     </div>
 </div>
 
-<div id="joystick-area"><div id="joystick-stick"></div></div>
-<div id="fire-btn">إطلاق</div>
-
 <div id="start-screen" class="screen">
-    <h1 style="color: #2ecc71; font-size: 48px; margin-bottom: 10px;">CS 2D MOBILE</h1>
-    <p style="margin-bottom: 30px; opacity: 0.8;">تحرك في الضباب.. ابحث عن الأعداء.. ابقَ حياً</p>
-    <button id="btn-play">ابدأ المهمة الآن</button>
+    <div class="menu-content">
+        <h1>CS 2D ULTRA</h1>
+        <p>اختر مستوى التحدي لبدء المهمة</p>
+        <div class="diff-container">
+            <button class="btn-diff easy" onclick="startGame('easy')">سهل</button>
+            <button class="btn-diff med" onclick="startGame('medium')">متوسط</button>
+            <button class="btn-diff hard" onclick="startGame('hard')">صعب جداً</button>
+        </div>
+    </div>
 </div>
 
 <div id="death-screen" class="screen hidden">
-    <h1 style="color: #e74c3c;">لقد تمت تصفيتك</h1>
-    <p>مجموع النقاط: <span id="final-score">0</span></p>
-    <button id="btn-restart">إعادة المحاولة</button>
+    <h1 style="color: var(--neon-red); -webkit-text-fill-color: initial;">تمت تصفيتك!</h1>
+    <p>لقد صمدت بشجاعة. نقاطك: <span id="final-score">0</span></p>
+    <button class="btn-diff med" onclick="location.reload()" style="margin-top:20px">العودة للرئيسية</button>
 </div>
+
+<div id="joy-bound"><div id="joy-stick"></div></div>
+<div id="fire-btn" class="mobile-btn">FIRE</div>
+<div id="grenade-btn" class="mobile-btn">BOMB</div>
 
 <canvas id="gameCanvas"></canvas>
 
@@ -57,271 +76,306 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-// إعدادات العالم والكاميرا
-const world = { width: 3000, height: 2500 };
+const world = { width: 3500, height: 3000 };
 let camera = { x: 0, y: 0 };
-let player, bots = [], bullets = [], walls = [];
-let gameRunning = false, score = 0;
+let player, bots = [], bullets = [], walls = [], pickups = [], grenades = [], effects = [], decor = [];
+let gameRunning = false, score = 0, difficulty = 'medium';
 let keys = {};
 let mouse = { x: 0, y: 0, down: false };
+let joy = { active: false, id: null, startX: 0, startY: 0, angle: 0, dist: 0 };
 
-// التحكم بالجويستيك
-let joy = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, angle: 0, dist: 0 };
-
-function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-}
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize);
 resize();
 
 class Entity {
-    constructor(x, y, type) {
+    constructor(x, y, type, config) {
         this.x = x; this.y = y;
-        this.radius = 20;
+        this.radius = 22;
         this.type = type;
-        this.hp = 100;
-        this.ammo = 30;
+        this.hp = config.hp || 100;
+        this.maxHp = this.hp;
+        this.ammo = 40;
+        this.grenades = 3;
         this.angle = 0;
-        this.speed = type === 'player' ? 4.5 : 2.2;
+        this.speed = config.speed || 4.5;
         this.lastShot = 0;
+        this.pulse = Math.random() * 10;
     }
-
     draw() {
+        let breath = Math.sin(Date.now() * 0.005 + this.pulse) * 2;
         ctx.save();
         ctx.translate(this.x - camera.x, this.y - camera.y);
         ctx.rotate(this.angle);
-        
-        // ظل
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        ctx.beginPath(); ctx.arc(4, 4, this.radius, 0, Math.PI*2); ctx.fill();
-
-        // لون الفريق (أخضر للاعب، أحمر للبوت)
-        ctx.fillStyle = this.type === 'player' ? '#2ecc71' : '#e74c3c';
-        ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.stroke();
-
-        // السلاح
-        ctx.fillStyle = '#222';
-        ctx.fillRect(15, -5, 30, 10);
-        ctx.fillStyle = '#ffcc00'; // فوهة السلاح
-        ctx.fillRect(40, -2, 8, 4);
-
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.beginPath(); ctx.arc(5, 5, this.radius + breath, 0, Math.PI*2); ctx.fill();
+        let grad = ctx.createRadialGradient(0,0,5,0,0,this.radius);
+        if(this.type === 'player') {
+            grad.addColorStop(0, '#55efc4'); grad.addColorStop(1, '#00b894');
+        } else {
+            grad.addColorStop(0, '#ff7675'); grad.addColorStop(1, '#d63031');
+        }
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(0, 0, this.radius + breath, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+        ctx.fillStyle = '#1e272e';
+        ctx.fillRect(15, -6, 28, 12);
+        ctx.fillStyle = '#fffa65';
+        ctx.fillRect(40, -3, 5, 6);
         ctx.restore();
     }
 }
 
-// تشغيل اللعبة
-document.getElementById('btn-play').addEventListener('click', startActualGame);
-document.getElementById('btn-restart').addEventListener('click', () => location.reload());
-
-function startActualGame() {
+function startGame(level) {
+    difficulty = level;
     document.getElementById('start-screen').classList.add('hidden');
     if(isMobile) {
-        document.getElementById('joystick-area').style.display = 'block';
         document.getElementById('fire-btn').style.display = 'flex';
+        document.getElementById('grenade-btn').style.display = 'flex';
     }
-    
-    player = new Entity(world.width/2, world.height/2, 'player');
-    generateProceduralMap();
-    gameRunning = true;
-    
-    for(let i=0; i<20; i++) spawnBot();
-    
-    requestAnimationFrame(gameLoop);
+    init();
 }
 
-function generateProceduralMap() {
-    walls = [];
-    // حدود الخريطة
-    walls.push({x:0, y:0, w:world.width, h:40});
-    walls.push({x:0, y:world.height-40, w:world.width, h:40});
-    walls.push({x:0, y:0, w:40, h:world.height});
-    walls.push({x:world.width-40, y:0, w:40, h:world.height});
+function init() {
+    player = new Entity(world.width/2, world.height/2, 'player', { hp: 100, speed: 5 });
+    let botCount = 20, botSpeed = 2.5;
+    if(difficulty === 'easy') { botCount = 10; botSpeed = 1.8; }
+    else if(difficulty === 'hard') { botCount = 35; botSpeed = 3.5; }
+    generateMap();
+    for(let i=0; i<botCount; i++) spawnBot(botSpeed);
+    for(let i=0; i<15; i++) spawnAmmo();
+    gameRunning = true;
+    requestAnimationFrame(loop);
+}
 
-    // إنشاء غرف وممرات
-    for(let i=0; i<50; i++) {
-        let w = 80 + Math.random() * 200;
-        let h = 80 + Math.random() * 200;
-        let x = Math.random() * (world.width - 300) + 100;
-        let y = Math.random() * (world.height - 300) + 100;
-        
-        // تجنب وضع جدار فوق اللاعب عند البداية
-        if(Math.hypot(x - world.width/2, y - world.height/2) > 250) {
-            walls.push({x, y, w, h, color: Math.random() > 0.5 ? '#2c3e50' : '#34495e'});
+function generateMap() {
+    walls = []; decor = [];
+    walls.push({x:0,y:0,w:world.width,h:60}, {x:0,y:world.height-60,w:world.width,h:60}, {x:0,y:0,w:60,h:world.height}, {x:world.width-60,y:0,w:60,h:world.height});
+    for(let i=0; i<60; i++) {
+        let x = Math.random()*world.width, y = Math.random()*world.height;
+        if(Math.hypot(x-player.x, y-player.y) > 400) {
+            walls.push({x, y, w:150+Math.random()*200, h:150+Math.random()*200, color: '#161625'});
         }
     }
+    for(let i=0; i<200; i++) {
+        decor.push({x: Math.random()*world.width, y: Math.random()*world.height, size: 2+Math.random()*5});
+    }
 }
 
-function spawnBot() {
-    let bx, by;
-    do {
-        bx = Math.random() * world.width;
-        by = Math.random() * world.height;
-    } while (isColliding(bx, by, 40) || Math.hypot(bx - player.x, by - player.y) < 600);
-    bots.push(new Entity(bx, by, 'bot'));
+function spawnBot(speed) {
+    let x, y;
+    do { x = Math.random()*world.width; y = Math.random()*world.height; } 
+    while (collide(x, y, 40) || Math.hypot(x-player.x, y-player.y) < 700);
+    bots.push(new Entity(x, y, 'bot', {hp: 80, speed: speed || 2.5}));
 }
 
-function isColliding(x, y, r) {
+function spawnAmmo() {
+    pickups.push({ x: Math.random()*world.width, y: Math.random()*world.height, type: 'ammo' });
+}
+
+function collide(x, y, r) {
     return walls.some(w => x+r > w.x && x-r < w.x+w.w && y+r > w.y && y-r < w.y+w.h);
 }
 
-function gameLoop() {
+function loop() {
     if(!gameRunning) return;
     update();
     draw();
-    requestAnimationFrame(gameLoop);
+    requestAnimationFrame(loop);
 }
 
 function update() {
     let mx = 0, my = 0;
-    
     if(joy.active) {
         mx = Math.cos(joy.angle) * player.speed * (joy.dist / 50);
         my = Math.sin(joy.angle) * player.speed * (joy.dist / 50);
         player.angle = joy.angle;
     } else {
-        if(keys['KeyW'] || keys['ArrowUp']) my -= player.speed;
-        if(keys['KeyS'] || keys['ArrowDown']) my += player.speed;
-        if(keys['KeyA'] || keys['ArrowLeft']) mx -= player.speed;
-        if(keys['KeyD'] || keys['ArrowRight']) mx += player.speed;
+        if(keys['KeyW']) my -= player.speed; if(keys['KeyS']) my += player.speed;
+        if(keys['KeyA']) mx -= player.speed; if(keys['KeyD']) mx += player.speed;
         if(!isMobile) player.angle = Math.atan2(mouse.y - (player.y - camera.y), mouse.x - (player.x - camera.x));
     }
-
-    if(!isColliding(player.x + mx, player.y, player.radius)) player.x += mx;
-    if(!isColliding(player.x, player.y + my, player.radius)) player.y += my;
-
+    if(!collide(player.x + mx, player.y, player.radius)) player.x += mx;
+    if(!collide(player.x, player.y + my, player.radius)) player.y += my;
     camera.x += (player.x - canvas.width/2 - camera.x) * 0.1;
     camera.y += (player.y - canvas.height/2 - camera.y) * 0.1;
-
-    if(mouse.down) fire(player);
-
-    // تحديث الرصاص والبوتات
+    if(mouse.down) fire();
+    pickups.forEach((p, i) => {
+        if(Math.hypot(player.x - p.x, player.y - p.y) < 40) {
+            player.ammo += 30; pickups.splice(i, 1);
+            setTimeout(spawnAmmo, 8000);
+        }
+    });
     bullets.forEach((b, i) => {
         b.x += b.vx; b.y += b.vy;
-        if(isColliding(b.x, b.y, 4)) bullets.splice(i, 1);
-        
-        if(b.owner === player) {
+        if(collide(b.x, b.y, 5)) bullets.splice(i, 1);
+        if(b.owner === 'player') {
             bots.forEach((bot, bi) => {
-                if(Math.hypot(b.x - bot.x, b.y - bot.y) < bot.radius) {
+                if(Math.hypot(b.x-bot.x, b.y-bot.y) < bot.radius) {
                     bot.hp -= 40; bullets.splice(i, 1);
                     if(bot.hp <= 0) { bots.splice(bi, 1); score += 50; spawnBot(); }
                 }
             });
-        } else if(Math.hypot(b.x - player.x, b.y - player.y) < player.radius) {
-            player.hp -= 10; bullets.splice(i, 1);
-            if(player.hp <= 0) gameOver();
+        } else if(Math.hypot(b.x-player.x, b.y-player.y) < player.radius) {
+            player.hp -= (difficulty === 'hard' ? 12 : 7); bullets.splice(i, 1);
+            if(player.hp <= 0) gameEnd();
         }
     });
-
+    grenades.forEach((g, i) => {
+        g.timer--; g.x += g.vx; g.y += g.vy; g.vx *= 0.96; g.vy *= 0.96;
+        if(g.timer <= 0) { explode(g.x, g.y); grenades.splice(i, 1); }
+    });
     bots.forEach(bot => {
         let d = Math.hypot(player.x - bot.x, player.y - bot.y);
         if(d < 500) {
             bot.angle = Math.atan2(player.y - bot.y, player.x - bot.x);
-            if(d < 350) fire(bot);
-            let bmx = Math.cos(bot.angle) * bot.speed;
-            let bmy = Math.sin(bot.angle) * bot.speed;
-            if(!isColliding(bot.x + bmx, bot.y, bot.radius)) bot.x += bmx;
-            if(!isColliding(bot.x, bot.y + bmy, bot.radius)) bot.y += bmy;
+            if(d < 350 && Math.random() < 0.04) botFire(bot);
+            let bmx = Math.cos(bot.angle)*bot.speed, bmy = Math.sin(bot.angle)*bot.speed;
+            if(!collide(bot.x+bmx, bot.y+bmy, bot.radius)) { bot.x += bmx; bot.y += bmy; }
         }
     });
-
-    document.getElementById('hp-fill').style.width = player.hp + '%';
-    document.getElementById('ammo-text').innerText = player.ammo;
-    document.getElementById('score-text').innerText = score;
+    updateUI();
 }
 
-function fire(ent) {
+function fire() {
     let now = Date.now();
-    if(now - ent.lastShot < 200 || ent.ammo <= 0) return;
-    ent.lastShot = now; ent.ammo--;
-    bullets.push({
-        x: ent.x + Math.cos(ent.angle) * 35,
-        y: ent.y + Math.sin(ent.angle) * 35,
-        vx: Math.cos(ent.angle) * 16,
-        vy: Math.sin(ent.angle) * 16,
-        owner: ent
+    if(now - player.lastShot < 120 || player.ammo <= 0) return;
+    player.lastShot = now; player.ammo--;
+    bullets.push({ x: player.x, y: player.y, vx: Math.cos(player.angle)*18, vy: Math.sin(player.angle)*18, owner: 'player' });
+}
+
+function botFire(bot) {
+    let now = Date.now();
+    if(now - bot.lastShot < (difficulty === 'hard' ? 400 : 700)) return;
+    bot.lastShot = now;
+    bullets.push({ x: bot.x, y: bot.y, vx: Math.cos(bot.angle)*12, vy: Math.sin(bot.angle)*12, owner: 'bot' });
+}
+
+function throwGrenade() {
+    if(player.grenades <= 0) return;
+    player.grenades--;
+    grenades.push({ x: player.x, y: player.y, vx: Math.cos(player.angle)*12, vy: Math.sin(player.angle)*12, timer: 50 });
+}
+
+function explode(x, y) {
+    effects.push({ x, y, r: 0, maxR: 180, alpha: 1 });
+    bots.forEach((bot, i) => {
+        if(Math.hypot(x - bot.x, y - bot.y) < 180) {
+            bot.hp = 0; bots.splice(i, 1); score += 100; spawnBot();
+        }
     });
 }
 
 function draw() {
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+    ctx.fillStyle = '#0a0a0c'; ctx.fillRect(0,0,canvas.width, canvas.height);
     ctx.save();
-    // رسم الأرضية والشبكة
-    ctx.strokeStyle = '#111';
-    for(let x = 0; x < world.width; x += 100) {
-        ctx.beginPath(); ctx.moveTo(x - camera.x, -camera.y); ctx.lineTo(x - camera.x, world.height - camera.y); ctx.stroke();
-    }
-    for(let y = 0; y < world.height; y += 100) {
-        ctx.beginPath(); ctx.moveTo(-camera.x, y - camera.y); ctx.lineTo(world.width - camera.x, y - camera.y); ctx.stroke();
-    }
-
-    // رسم الجدران
-    walls.forEach(w => {
-        ctx.fillStyle = w.color || '#333';
-        ctx.fillRect(w.x - camera.x, w.y - camera.y, w.w, w.h);
+    ctx.fillStyle = 'rgba(46, 204, 113, 0.15)';
+    decor.forEach(d => ctx.fillRect(d.x-camera.x, d.y-camera.y, d.size, d.size));
+    walls.forEach(w => { 
+        ctx.fillStyle = w.color || '#161625'; ctx.fillRect(w.x-camera.x, w.y-camera.y, w.w, w.h); 
+        ctx.strokeStyle = '#222'; ctx.strokeRect(w.x-camera.x, w.y-camera.y, w.w, w.h);
     });
-
-    // رسم الرصاص والأعداء (فقط إذا كانوا في مجال الرؤية)
-    bullets.forEach(b => {
-        ctx.fillStyle = '#ffff00';
-        ctx.beginPath(); ctx.arc(b.x - camera.x, b.y - camera.y, 4, 0, Math.PI*2); ctx.fill();
+    pickups.forEach(p => { 
+        let s = 20 + Math.sin(Date.now()*0.01)*5;
+        ctx.fillStyle = '#f1c40f'; ctx.shadowBlur = 15; ctx.shadowColor = '#f1c40f';
+        ctx.fillRect(p.x-camera.x-s/2, p.y-camera.y-s/2, s, s);
+        ctx.shadowBlur = 0;
     });
-
-    bots.forEach(bot => {
-        if(Math.hypot(player.x - bot.x, player.y - bot.y) < 450) bot.draw();
+    bullets.forEach(b => { 
+        ctx.fillStyle = b.owner === 'player' ? '#55efc4' : '#ff7675';
+        ctx.beginPath(); ctx.arc(b.x-camera.x, b.y-camera.y, 4, 0, Math.PI*2); ctx.fill(); 
     });
-
+    grenades.forEach(g => { 
+        ctx.fillStyle = '#e67e22'; ctx.beginPath(); ctx.arc(g.x-camera.x, g.y-camera.y, 10, 0, Math.PI*2); ctx.fill(); 
+    });
+    bots.forEach(b => b.draw());
     player.draw();
+    effects.forEach((e, i) => {
+        ctx.beginPath(); ctx.arc(e.x-camera.x, e.y-camera.y, e.r, 0, Math.PI*2);
+        ctx.strokeStyle = `rgba(255, 165, 2, ${e.alpha})`; ctx.lineWidth = 8; ctx.stroke();
+        e.r += 12; e.alpha -= 0.04; if(e.alpha <= 0) effects.splice(i, 1);
+    });
     ctx.restore();
-
-    // --- الضباب المتحرك (Fog of War) ---
-    let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 80, canvas.width/2, canvas.height/2, 450);
-    grad.addColorStop(0, 'rgba(0,0,0,0)');
-    grad.addColorStop(1, 'rgba(0,0,0,0.95)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 60, canvas.width/2, canvas.height/2, 500);
+    grad.addColorStop(0, 'transparent'); grad.addColorStop(1, 'rgba(0,0,0,0.85)');
+    ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
 }
 
-function gameOver() {
-    gameRunning = false;
-    document.getElementById('death-screen').classList.remove('hidden');
-    document.getElementById('final-score').innerText = score;
+function updateUI() {
+    document.getElementById('hp-val').innerText = Math.max(0, Math.floor(player.hp));
+    document.getElementById('hp-fill').style.width = player.hp + '%';
+    document.getElementById('ammo-text').innerText = player.ammo;
+    document.getElementById('grenade-text').innerText = player.grenades;
+    document.getElementById('score-text').innerText = score;
 }
 
-// أحداث الهاتف
-window.addEventListener('touchstart', e => {
-    let t = e.touches[0];
-    if(t.clientX < window.innerWidth / 2) {
-        joy.active = true; joy.startX = t.clientX; joy.startY = t.clientY;
-        document.getElementById('joystick-area').style.left = (joy.startX - 65) + 'px';
-        document.getElementById('joystick-area').style.top = (joy.startY - 65) + 'px';
+function gameEnd() { gameRunning = false; document.getElementById('death-screen').classList.remove('hidden'); document.getElementById('final-score').innerText = score; }
+
+// --- FIXED TOUCH LOGIC ---
+const joyBound = document.getElementById('joy-bound');
+const joyStick = document.getElementById('joy-stick');
+
+function handleTouch(e) {
+    // إصلاح: السماح باللمس للأزرار إذا كانت اللعبة متوقفة
+    if(!gameRunning) return;
+
+    if (e.cancelable) e.preventDefault();
+    for(let i=0; i<e.changedTouches.length; i++) {
+        let t = e.changedTouches[i];
+        if(t.clientX < window.innerWidth/2 && !joy.active) {
+            joy.active = true;
+            joy.id = t.identifier;
+            joy.startX = t.clientX;
+            joy.startY = t.clientY;
+            
+            joyBound.style.display = 'block';
+            joyBound.style.left = (t.clientX - 60) + 'px';
+            joyBound.style.top = (t.clientY - 60) + 'px';
+        }
     }
-});
-window.addEventListener('touchmove', e => {
-    if(!joy.active) return;
-    let t = e.touches[0];
-    let dx = t.clientX - joy.startX; let dy = t.clientY - joy.startY;
-    joy.dist = Math.min(Math.hypot(dx, dy), 50);
-    joy.angle = Math.atan2(dy, dx);
-    document.getElementById('joystick-stick').style.transform = `translate(${Math.cos(joy.angle)*joy.dist}px, ${Math.sin(joy.angle)*joy.dist}px)`;
-});
-window.addEventListener('touchend', () => {
-    joy.active = false;
-    document.getElementById('joystick-stick').style.transform = 'translate(0,0)';
-    document.getElementById('joystick-area').style.left = '40px'; document.getElementById('joystick-area').style.top = 'auto';
-});
-document.getElementById('fire-btn').addEventListener('touchstart', e => { e.preventDefault(); mouse.down = true; });
-document.getElementById('fire-btn').addEventListener('touchend', () => mouse.down = false);
+}
 
-// أحداث الكمبيوتر
-window.addEventListener('keydown', e => keys[e.code] = true);
+function moveTouch(e) {
+    if(!gameRunning) return;
+    for(let i=0; i<e.changedTouches.length; i++) {
+        let t = e.changedTouches[i];
+        if(joy.active && t.identifier === joy.id) {
+            let dx = t.clientX - joy.startX;
+            let dy = t.clientY - joy.startY;
+            joy.dist = Math.min(Math.hypot(dx,dy), 50);
+            joy.angle = Math.atan2(dy, dx);
+            joyStick.style.transform = `translate(${Math.cos(joy.angle)*joy.dist}px, ${Math.sin(joy.angle)*joy.dist}px)`;
+        }
+    }
+}
+
+function endTouch(e) {
+    for(let i=0; i<e.changedTouches.length; i++) {
+        let t = e.changedTouches[i];
+        if(joy.active && t.identifier === joy.id) {
+            joy.active = false;
+            joy.id = null;
+            joyBound.style.display = 'none';
+            joyStick.style.transform = 'translate(0,0)';
+        }
+    }
+}
+
+window.addEventListener('touchstart', handleTouch, {passive: false});
+window.addEventListener('touchmove', moveTouch, {passive: false});
+window.addEventListener('touchend', endTouch);
+window.addEventListener('touchcancel', endTouch);
+
+document.getElementById('fire-btn').addEventListener('touchstart', (e) => { e.stopPropagation(); if(gameRunning) mouse.down = true; });
+document.getElementById('fire-btn').addEventListener('touchend', (e) => { e.stopPropagation(); mouse.down = false; });
+document.getElementById('grenade-btn').addEventListener('touchstart', (e) => { e.stopPropagation(); if(gameRunning) throwGrenade(); });
+
+// Desktop
+window.addEventListener('keydown', e => { keys[e.code] = true; if(e.code === 'KeyG') throwGrenade(); });
 window.addEventListener('keyup', e => keys[e.code] = false);
-window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
-window.addEventListener('mousedown', () => mouse.down = true);
-window.addEventListener('mouseup', () => mouse.down = false);
+window.addEventListener('mousemove', e => { if(!isMobile) { mouse.x = e.clientX; mouse.y = e.clientY; } });
+window.addEventListener('mousedown', () => { if(!isMobile && gameRunning) mouse.down = true; });
+window.addEventListener('mouseup', () => { if(!isMobile) mouse.down = false; });
 </script>
 </body>
 </html>
