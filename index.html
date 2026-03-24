@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D FPS Browser Game</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+        #ui {
+            position: absolute; top: 20px; left: 20px; color: white;
+            text-shadow: 2px 2px 4px #000; pointer-events: none;
+        }
+        #crosshair {
+            position: absolute; top: 50%; left: 50%;
+            width: 20px; height: 20px; border: 2px solid white;
+            border-radius: 50%; transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+        #msg {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            color: white; background: rgba(0,0,0,0.7); padding: 20px; text-align: center;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+<div id="ui">
+    <div>الصحة: <span id="health">100</span></div>
+    <div>النقاط: <span id="score">0</span></div>
+</div>
+<div id="crosshair"></div>
+<div id="msg">اضغط هنا للبدء<br>(WASD للتحرك، الماوس للتصويب)</div>
+
+<!-- تحميل Three.js و PointerLockControls -->
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+</script>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+    // --- الإعدادات القابلة للتعديل ---
+    const CONFIG = {
+        mapSize: 50,
+        wallCount: 40,
+        botCount: 5,
+        botSpeed: 0.05,
+        playerSpeed: 0.15
+    };
+
+    // متغيرات الحالة
+    let health = 100;
+    let score = 0;
+    let bullets = [];
+    let enemies = [];
+    let walls = [];
+    let canShoot = true;
+
+    // مشهد Three.js
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x87ceeb); // سماء زرقاء
+    scene.fog = new THREE.Fog(0x87ceeb, 0, 50);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // الإضاءة
+    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
+    scene.add(light);
+
+    // التحكم
+    const controls = new PointerLockControls(camera, document.body);
+    const msg = document.getElementById('msg');
+    msg.addEventListener('click', () => controls.lock());
+    controls.addEventListener('lock', () => msg.style.display = 'none');
+    controls.addEventListener('unlock', () => msg.style.display = 'block');
+
+    // الأرضية
+    const floorGeo = new THREE.PlaneGeometry(200, 200);
+    const floorMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    scene.add(floor);
+
+    // إنشاء جدران عشوائية
+    function createMap() {
+        const wallGeo = new THREE.BoxGeometry(4, 4, 4);
+        const wallMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
+        for (let i = 0; i < CONFIG.wallCount; i++) {
+            const wall = new THREE.Mesh(wallGeo, wallMat);
+            wall.position.set(
+                (Math.random() - 0.5) * CONFIG.mapSize,
+                2,
+                (Math.random() - 0.5) * CONFIG.mapSize
+            );
+            scene.add(wall);
+            walls.push(wall);
+        }
+    }
+    createMap();
+
+    // إنشاء البوتات
+    function createEnemy() {
+        const enemyGeo = new THREE.BoxGeometry(1, 2, 1);
+        const enemyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+        const enemy = new THREE.Mesh(enemyGeo, enemyMat);
+        enemy.position.set(
+            (Math.random() - 0.5) * CONFIG.mapSize,
+            1,
+            (Math.random() - 0.5) * CONFIG.mapSize
+        );
+        enemy.userData = { health: 50 };
+        scene.add(enemy);
+        enemies.push(enemy);
+    }
+    for (let i = 0; i < CONFIG.botCount; i++) createEnemy();
+
+    // إطلاق النار
+    window.addEventListener('mousedown', () => {
+        if (!controls.isLocked) return;
+        
+        // شعاع للتصويب
+        const raycaster = new THREE.Raycaster();
+        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
+        
+        const intersects = raycaster.intersectObjects(enemies);
+        if (intersects.length > 0) {
+            const target = intersects[0].object;
+            target.userData.health -= 25;
+            if (target.userData.health <= 0) {
+                respawnEnemy(target);
+                score += 10;
+                document.getElementById('score').innerText = score;
+            }
+        }
+        
+        // تأثير بصري بسيط للرصاصة
+        const bulletGeo = new THREE.SphereGeometry(0.05);
+        const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
+        const bullet = new THREE.Mesh(bulletGeo, bulletMat);
+        bullet.position.copy(camera.position);
+        bullet.velocity = new THREE.Vector3();
+        camera.getWorldDirection(bullet.velocity);
+        scene.add(bullet);
+        bullets.push(bullet);
+        setTimeout(() => { scene.remove(bullet); bullets = bullets.filter(b => b !== bullet); }, 1000);
+    });
+
+    function respawnEnemy(enemy) {
+        enemy.position.set((Math.random() - 0.5) * 50, 1, (Math.random() - 0.5) * 50);
+        enemy.userData.health = 50;
+    }
+
+    // حركة اللاعب
+    const keys = {};
+    window.addEventListener('keydown', (e) => keys[e.code] = true);
+    window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+    function updateMovement() {
+        if (!controls.isLocked) return;
+        const direction = new THREE.Vector3();
+        if (keys['KeyW']) controls.moveForward(CONFIG.playerSpeed);
+        if (keys['KeyS']) controls.moveForward(-CONFIG.playerSpeed);
+        if (keys['KeyA']) controls.moveRight(-CONFIG.playerSpeed);
+        if (keys['KeyD']) controls.moveRight(CONFIG.playerSpeed);
+        
+        // منع الخروج من الحدود
+        if (Math.abs(camera.position.x) > 45 || Math.abs(camera.position.z) > 45) {
+             camera.position.set(0, 1.6, 0);
+        }
+    }
+
+    // تحديث البوتات والذكاء الاصطناعي
+    function updateEnemies() {
+        enemies.forEach(enemy => {
+            // التحرك نحو اللاعب
+            const dir = new THREE.Vector3().subVectors(camera.position, enemy.position).normalize();
+            enemy.position.addScaledVector(dir, CONFIG.botSpeed);
+            enemy.lookAt(camera.position);
+
+            // إذا اقترب البوت جداً ينقص صحة اللاعب
+            if (enemy.position.distanceTo(camera.position) < 2) {
+                health -= 0.2;
+                document.getElementById('health').innerText = Math.floor(health);
+                if (health <= 0) location.reload(); // إعادة تشغيل عند الموت
+            }
+        });
+    }
+
+    // حلقة التحديث المستمر
+    function animate() {
+        requestAnimationFrame(animate);
+        
+        updateMovement();
+        updateEnemies();
+        
+        bullets.forEach(b => b.position.addScaledVector(b.velocity, 1));
+        
+        renderer.render(scene, camera);
+    }
+
+    // البدء
+    camera.position.y = 1.6;
+    animate();
+
+    // ضبط الشاشة عند التكبير/التصغير
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+</script>
+</body>
+</html>
