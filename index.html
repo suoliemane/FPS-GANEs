@@ -1,224 +1,327 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D FPS Browser Game</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CS 2D Ultimate - Fog & Mobile</title>
     <style>
-        body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
-        #ui {
-            position: absolute; top: 20px; left: 20px; color: white;
-            text-shadow: 2px 2px 4px #000; pointer-events: none;
-        }
-        #crosshair {
-            position: absolute; top: 50%; left: 50%;
-            width: 20px; height: 20px; border: 2px solid white;
-            border-radius: 50%; transform: translate(-50%, -50%);
-            pointer-events: none;
-        }
-        #msg {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            color: white; background: rgba(0,0,0,0.7); padding: 20px; text-align: center;
-            cursor: pointer;
-        }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #050505; font-family: 'Segoe UI', sans-serif; user-select: none; touch-action: none; }
+        canvas { display: block; }
+        
+        #ui { position: absolute; top: 15px; left: 15px; color: #fff; pointer-events: none; z-index: 10; text-shadow: 2px 2px 4px #000; }
+        .stats-box { background: rgba(0,0,0,0.6); padding: 10px; border-radius: 8px; border: 1px solid #444; }
+        .bar-bg { width: 150px; height: 12px; background: #300; border: 1px solid #ff4d4d; border-radius: 6px; overflow: hidden; margin: 5px 0; }
+        #hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4d4d, #ff0000); transition: width 0.3s; }
+
+        /* الأزرار والشاشات */
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+        button { padding: 15px 50px; font-size: 22px; cursor: pointer; background: #2ecc71; color: white; border: none; border-radius: 50px; font-weight: bold; box-shadow: 0 4px 15px rgba(46, 204, 113, 0.4); transition: 0.2s; }
+        button:active { transform: scale(0.95); background: #27ae60; }
+        .hidden { display: none !important; }
+
+        /* تحكم الهاتف */
+        #joystick-area { position: absolute; bottom: 40px; left: 40px; width: 130px; height: 130px; background: rgba(255,255,255,0.05); border: 2px solid rgba(255,255,255,0.1); border-radius: 50%; display: none; z-index: 20; }
+        #joystick-stick { position: absolute; top: 40px; left: 40px; width: 50px; height: 50px; background: rgba(255,255,255,0.4); border-radius: 50%; }
+        #fire-btn { position: absolute; bottom: 50px; right: 50px; width: 100px; height: 100px; background: rgba(255,0,0,0.3); border: 4px solid #fff; border-radius: 50%; display: none; z-index: 20; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="ui">
-    <div>الصحة: <span id="health">100</span></div>
-    <div>النقاط: <span id="score">0</span></div>
+    <div class="stats-box">
+        <div>الصحة</div>
+        <div class="bar-bg"><div id="hp-fill"></div></div>
+        <div>الذخيرة: <span id="ammo-text">30</span> | النقاط: <span id="score-text">0</span></div>
+    </div>
 </div>
-<div id="crosshair"></div>
-<div id="msg">اضغط هنا للبدء<br>(WASD للتحرك، الماوس للتصويب)</div>
 
-<!-- تحميل Three.js و PointerLockControls -->
-<script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+<div id="joystick-area"><div id="joystick-stick"></div></div>
+<div id="fire-btn">إطلاق</div>
+
+<div id="start-screen" class="screen">
+    <h1 style="color: #2ecc71; font-size: 48px; margin-bottom: 10px;">CS 2D MOBILE</h1>
+    <p style="margin-bottom: 30px; opacity: 0.8;">تحرك في الضباب.. ابحث عن الأعداء.. ابقَ حياً</p>
+    <button id="btn-play">ابدأ المهمة الآن</button>
+</div>
+
+<div id="death-screen" class="screen hidden">
+    <h1 style="color: #e74c3c;">لقد تمت تصفيتك</h1>
+    <p>مجموع النقاط: <span id="final-score">0</span></p>
+    <button id="btn-restart">إعادة المحاولة</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const isMobile = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+// إعدادات العالم والكاميرا
+const world = { width: 3000, height: 2500 };
+let camera = { x: 0, y: 0 };
+let player, bots = [], bullets = [], walls = [];
+let gameRunning = false, score = 0;
+let keys = {};
+let mouse = { x: 0, y: 0, down: false };
+
+// التحكم بالجويستيك
+let joy = { active: false, startX: 0, startY: 0, moveX: 0, moveY: 0, angle: 0, dist: 0 };
+
+function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+class Entity {
+    constructor(x, y, type) {
+        this.x = x; this.y = y;
+        this.radius = 20;
+        this.type = type;
+        this.hp = 100;
+        this.ammo = 30;
+        this.angle = 0;
+        this.speed = type === 'player' ? 4.5 : 2.2;
+        this.lastShot = 0;
+    }
+
+    draw() {
+        ctx.save();
+        ctx.translate(this.x - camera.x, this.y - camera.y);
+        ctx.rotate(this.angle);
+        
+        // ظل
+        ctx.fillStyle = 'rgba(0,0,0,0.4)';
+        ctx.beginPath(); ctx.arc(4, 4, this.radius, 0, Math.PI*2); ctx.fill();
+
+        // لون الفريق (أخضر للاعب، أحمر للبوت)
+        ctx.fillStyle = this.type === 'player' ? '#2ecc71' : '#e74c3c';
+        ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.stroke();
+
+        // السلاح
+        ctx.fillStyle = '#222';
+        ctx.fillRect(15, -5, 30, 10);
+        ctx.fillStyle = '#ffcc00'; // فوهة السلاح
+        ctx.fillRect(40, -2, 8, 4);
+
+        ctx.restore();
+    }
+}
+
+// تشغيل اللعبة
+document.getElementById('btn-play').addEventListener('click', startActualGame);
+document.getElementById('btn-restart').addEventListener('click', () => location.reload());
+
+function startActualGame() {
+    document.getElementById('start-screen').classList.add('hidden');
+    if(isMobile) {
+        document.getElementById('joystick-area').style.display = 'block';
+        document.getElementById('fire-btn').style.display = 'flex';
+    }
+    
+    player = new Entity(world.width/2, world.height/2, 'player');
+    generateProceduralMap();
+    gameRunning = true;
+    
+    for(let i=0; i<20; i++) spawnBot();
+    
+    requestAnimationFrame(gameLoop);
+}
+
+function generateProceduralMap() {
+    walls = [];
+    // حدود الخريطة
+    walls.push({x:0, y:0, w:world.width, h:40});
+    walls.push({x:0, y:world.height-40, w:world.width, h:40});
+    walls.push({x:0, y:0, w:40, h:world.height});
+    walls.push({x:world.width-40, y:0, w:40, h:world.height});
+
+    // إنشاء غرف وممرات
+    for(let i=0; i<50; i++) {
+        let w = 80 + Math.random() * 200;
+        let h = 80 + Math.random() * 200;
+        let x = Math.random() * (world.width - 300) + 100;
+        let y = Math.random() * (world.height - 300) + 100;
+        
+        // تجنب وضع جدار فوق اللاعب عند البداية
+        if(Math.hypot(x - world.width/2, y - world.height/2) > 250) {
+            walls.push({x, y, w, h, color: Math.random() > 0.5 ? '#2c3e50' : '#34495e'});
         }
     }
-</script>
+}
 
-<script type="module">
-    import * as THREE from 'three';
-    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+function spawnBot() {
+    let bx, by;
+    do {
+        bx = Math.random() * world.width;
+        by = Math.random() * world.height;
+    } while (isColliding(bx, by, 40) || Math.hypot(bx - player.x, by - player.y) < 600);
+    bots.push(new Entity(bx, by, 'bot'));
+}
 
-    // --- الإعدادات القابلة للتعديل ---
-    const CONFIG = {
-        mapSize: 50,
-        wallCount: 40,
-        botCount: 5,
-        botSpeed: 0.05,
-        playerSpeed: 0.15
-    };
+function isColliding(x, y, r) {
+    return walls.some(w => x+r > w.x && x-r < w.x+w.w && y+r > w.y && y-r < w.y+w.h);
+}
 
-    // متغيرات الحالة
-    let health = 100;
-    let score = 0;
-    let bullets = [];
-    let enemies = [];
-    let walls = [];
-    let canShoot = true;
+function gameLoop() {
+    if(!gameRunning) return;
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
 
-    // مشهد Three.js
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x87ceeb); // سماء زرقاء
-    scene.fog = new THREE.Fog(0x87ceeb, 0, 50);
-
-    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
-
-    // الإضاءة
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-    scene.add(light);
-
-    // التحكم
-    const controls = new PointerLockControls(camera, document.body);
-    const msg = document.getElementById('msg');
-    msg.addEventListener('click', () => controls.lock());
-    controls.addEventListener('lock', () => msg.style.display = 'none');
-    controls.addEventListener('unlock', () => msg.style.display = 'block');
-
-    // الأرضية
-    const floorGeo = new THREE.PlaneGeometry(200, 200);
-    const floorMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
-    const floor = new THREE.Mesh(floorGeo, floorMat);
-    floor.rotation.x = -Math.PI / 2;
-    scene.add(floor);
-
-    // إنشاء جدران عشوائية
-    function createMap() {
-        const wallGeo = new THREE.BoxGeometry(4, 4, 4);
-        const wallMat = new THREE.MeshPhongMaterial({ color: 0x888888 });
-        for (let i = 0; i < CONFIG.wallCount; i++) {
-            const wall = new THREE.Mesh(wallGeo, wallMat);
-            wall.position.set(
-                (Math.random() - 0.5) * CONFIG.mapSize,
-                2,
-                (Math.random() - 0.5) * CONFIG.mapSize
-            );
-            scene.add(wall);
-            walls.push(wall);
-        }
+function update() {
+    let mx = 0, my = 0;
+    
+    if(joy.active) {
+        mx = Math.cos(joy.angle) * player.speed * (joy.dist / 50);
+        my = Math.sin(joy.angle) * player.speed * (joy.dist / 50);
+        player.angle = joy.angle;
+    } else {
+        if(keys['KeyW'] || keys['ArrowUp']) my -= player.speed;
+        if(keys['KeyS'] || keys['ArrowDown']) my += player.speed;
+        if(keys['KeyA'] || keys['ArrowLeft']) mx -= player.speed;
+        if(keys['KeyD'] || keys['ArrowRight']) mx += player.speed;
+        if(!isMobile) player.angle = Math.atan2(mouse.y - (player.y - camera.y), mouse.x - (player.x - camera.x));
     }
-    createMap();
 
-    // إنشاء البوتات
-    function createEnemy() {
-        const enemyGeo = new THREE.BoxGeometry(1, 2, 1);
-        const enemyMat = new THREE.MeshPhongMaterial({ color: 0xff0000 });
-        const enemy = new THREE.Mesh(enemyGeo, enemyMat);
-        enemy.position.set(
-            (Math.random() - 0.5) * CONFIG.mapSize,
-            1,
-            (Math.random() - 0.5) * CONFIG.mapSize
-        );
-        enemy.userData = { health: 50 };
-        scene.add(enemy);
-        enemies.push(enemy);
-    }
-    for (let i = 0; i < CONFIG.botCount; i++) createEnemy();
+    if(!isColliding(player.x + mx, player.y, player.radius)) player.x += mx;
+    if(!isColliding(player.x, player.y + my, player.radius)) player.y += my;
 
-    // إطلاق النار
-    window.addEventListener('mousedown', () => {
-        if (!controls.isLocked) return;
+    camera.x += (player.x - canvas.width/2 - camera.x) * 0.1;
+    camera.y += (player.y - canvas.height/2 - camera.y) * 0.1;
+
+    if(mouse.down) fire(player);
+
+    // تحديث الرصاص والبوتات
+    bullets.forEach((b, i) => {
+        b.x += b.vx; b.y += b.vy;
+        if(isColliding(b.x, b.y, 4)) bullets.splice(i, 1);
         
-        // شعاع للتصويب
-        const raycaster = new THREE.Raycaster();
-        raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-        
-        const intersects = raycaster.intersectObjects(enemies);
-        if (intersects.length > 0) {
-            const target = intersects[0].object;
-            target.userData.health -= 25;
-            if (target.userData.health <= 0) {
-                respawnEnemy(target);
-                score += 10;
-                document.getElementById('score').innerText = score;
-            }
+        if(b.owner === player) {
+            bots.forEach((bot, bi) => {
+                if(Math.hypot(b.x - bot.x, b.y - bot.y) < bot.radius) {
+                    bot.hp -= 40; bullets.splice(i, 1);
+                    if(bot.hp <= 0) { bots.splice(bi, 1); score += 50; spawnBot(); }
+                }
+            });
+        } else if(Math.hypot(b.x - player.x, b.y - player.y) < player.radius) {
+            player.hp -= 10; bullets.splice(i, 1);
+            if(player.hp <= 0) gameOver();
         }
-        
-        // تأثير بصري بسيط للرصاصة
-        const bulletGeo = new THREE.SphereGeometry(0.05);
-        const bulletMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-        const bullet = new THREE.Mesh(bulletGeo, bulletMat);
-        bullet.position.copy(camera.position);
-        bullet.velocity = new THREE.Vector3();
-        camera.getWorldDirection(bullet.velocity);
-        scene.add(bullet);
-        bullets.push(bullet);
-        setTimeout(() => { scene.remove(bullet); bullets = bullets.filter(b => b !== bullet); }, 1000);
     });
 
-    function respawnEnemy(enemy) {
-        enemy.position.set((Math.random() - 0.5) * 50, 1, (Math.random() - 0.5) * 50);
-        enemy.userData.health = 50;
-    }
-
-    // حركة اللاعب
-    const keys = {};
-    window.addEventListener('keydown', (e) => keys[e.code] = true);
-    window.addEventListener('keyup', (e) => keys[e.code] = false);
-
-    function updateMovement() {
-        if (!controls.isLocked) return;
-        const direction = new THREE.Vector3();
-        if (keys['KeyW']) controls.moveForward(CONFIG.playerSpeed);
-        if (keys['KeyS']) controls.moveForward(-CONFIG.playerSpeed);
-        if (keys['KeyA']) controls.moveRight(-CONFIG.playerSpeed);
-        if (keys['KeyD']) controls.moveRight(CONFIG.playerSpeed);
-        
-        // منع الخروج من الحدود
-        if (Math.abs(camera.position.x) > 45 || Math.abs(camera.position.z) > 45) {
-             camera.position.set(0, 1.6, 0);
+    bots.forEach(bot => {
+        let d = Math.hypot(player.x - bot.x, player.y - bot.y);
+        if(d < 500) {
+            bot.angle = Math.atan2(player.y - bot.y, player.x - bot.x);
+            if(d < 350) fire(bot);
+            let bmx = Math.cos(bot.angle) * bot.speed;
+            let bmy = Math.sin(bot.angle) * bot.speed;
+            if(!isColliding(bot.x + bmx, bot.y, bot.radius)) bot.x += bmx;
+            if(!isColliding(bot.x, bot.y + bmy, bot.radius)) bot.y += bmy;
         }
-    }
-
-    // تحديث البوتات والذكاء الاصطناعي
-    function updateEnemies() {
-        enemies.forEach(enemy => {
-            // التحرك نحو اللاعب
-            const dir = new THREE.Vector3().subVectors(camera.position, enemy.position).normalize();
-            enemy.position.addScaledVector(dir, CONFIG.botSpeed);
-            enemy.lookAt(camera.position);
-
-            // إذا اقترب البوت جداً ينقص صحة اللاعب
-            if (enemy.position.distanceTo(camera.position) < 2) {
-                health -= 0.2;
-                document.getElementById('health').innerText = Math.floor(health);
-                if (health <= 0) location.reload(); // إعادة تشغيل عند الموت
-            }
-        });
-    }
-
-    // حلقة التحديث المستمر
-    function animate() {
-        requestAnimationFrame(animate);
-        
-        updateMovement();
-        updateEnemies();
-        
-        bullets.forEach(b => b.position.addScaledVector(b.velocity, 1));
-        
-        renderer.render(scene, camera);
-    }
-
-    // البدء
-    camera.position.y = 1.6;
-    animate();
-
-    // ضبط الشاشة عند التكبير/التصغير
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
+    document.getElementById('hp-fill').style.width = player.hp + '%';
+    document.getElementById('ammo-text').innerText = player.ammo;
+    document.getElementById('score-text').innerText = score;
+}
+
+function fire(ent) {
+    let now = Date.now();
+    if(now - ent.lastShot < 200 || ent.ammo <= 0) return;
+    ent.lastShot = now; ent.ammo--;
+    bullets.push({
+        x: ent.x + Math.cos(ent.angle) * 35,
+        y: ent.y + Math.sin(ent.angle) * 35,
+        vx: Math.cos(ent.angle) * 16,
+        vy: Math.sin(ent.angle) * 16,
+        owner: ent
+    });
+}
+
+function draw() {
+    ctx.fillStyle = '#0a0a0a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    // رسم الأرضية والشبكة
+    ctx.strokeStyle = '#111';
+    for(let x = 0; x < world.width; x += 100) {
+        ctx.beginPath(); ctx.moveTo(x - camera.x, -camera.y); ctx.lineTo(x - camera.x, world.height - camera.y); ctx.stroke();
+    }
+    for(let y = 0; y < world.height; y += 100) {
+        ctx.beginPath(); ctx.moveTo(-camera.x, y - camera.y); ctx.lineTo(world.width - camera.x, y - camera.y); ctx.stroke();
+    }
+
+    // رسم الجدران
+    walls.forEach(w => {
+        ctx.fillStyle = w.color || '#333';
+        ctx.fillRect(w.x - camera.x, w.y - camera.y, w.w, w.h);
+    });
+
+    // رسم الرصاص والأعداء (فقط إذا كانوا في مجال الرؤية)
+    bullets.forEach(b => {
+        ctx.fillStyle = '#ffff00';
+        ctx.beginPath(); ctx.arc(b.x - camera.x, b.y - camera.y, 4, 0, Math.PI*2); ctx.fill();
+    });
+
+    bots.forEach(bot => {
+        if(Math.hypot(player.x - bot.x, player.y - bot.y) < 450) bot.draw();
+    });
+
+    player.draw();
+    ctx.restore();
+
+    // --- الضباب المتحرك (Fog of War) ---
+    let grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 80, canvas.width/2, canvas.height/2, 450);
+    grad.addColorStop(0, 'rgba(0,0,0,0)');
+    grad.addColorStop(1, 'rgba(0,0,0,0.95)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function gameOver() {
+    gameRunning = false;
+    document.getElementById('death-screen').classList.remove('hidden');
+    document.getElementById('final-score').innerText = score;
+}
+
+// أحداث الهاتف
+window.addEventListener('touchstart', e => {
+    let t = e.touches[0];
+    if(t.clientX < window.innerWidth / 2) {
+        joy.active = true; joy.startX = t.clientX; joy.startY = t.clientY;
+        document.getElementById('joystick-area').style.left = (joy.startX - 65) + 'px';
+        document.getElementById('joystick-area').style.top = (joy.startY - 65) + 'px';
+    }
+});
+window.addEventListener('touchmove', e => {
+    if(!joy.active) return;
+    let t = e.touches[0];
+    let dx = t.clientX - joy.startX; let dy = t.clientY - joy.startY;
+    joy.dist = Math.min(Math.hypot(dx, dy), 50);
+    joy.angle = Math.atan2(dy, dx);
+    document.getElementById('joystick-stick').style.transform = `translate(${Math.cos(joy.angle)*joy.dist}px, ${Math.sin(joy.angle)*joy.dist}px)`;
+});
+window.addEventListener('touchend', () => {
+    joy.active = false;
+    document.getElementById('joystick-stick').style.transform = 'translate(0,0)';
+    document.getElementById('joystick-area').style.left = '40px'; document.getElementById('joystick-area').style.top = 'auto';
+});
+document.getElementById('fire-btn').addEventListener('touchstart', e => { e.preventDefault(); mouse.down = true; });
+document.getElementById('fire-btn').addEventListener('touchend', () => mouse.down = false);
+
+// أحداث الكمبيوتر
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+window.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+window.addEventListener('mousedown', () => mouse.down = true);
+window.addEventListener('mouseup', () => mouse.down = false);
 </script>
 </body>
 </html>
